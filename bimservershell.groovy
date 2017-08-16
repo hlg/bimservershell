@@ -3,21 +3,28 @@
     @Grab(group='org.opensourcebim', module='pluginbase', version='1.5.76')
 ])
 
-import org.bimserver.client.BimServerClient;
-import org.bimserver.client.json.JsonBimServerClientFactory;
-import org.bimserver.interfaces.objects.SProject;
-import org.bimserver.shared.UsernamePasswordAuthenticationInfo;
-import org.bimserver.emf.IfcModelInterface;
+import org.bimserver.client.BimServerClient
+import org.bimserver.client.json.JsonBimServerClientFactory
+import org.bimserver.interfaces.objects.SProject
+import org.bimserver.shared.UsernamePasswordAuthenticationInfo
+import org.bimserver.emf.IfcModelInterface
 
 import org.codehaus.groovy.tools.shell.Groovysh
 import org.codehaus.groovy.tools.shell.IO 
 
-JsonBimServerClientFactory factory = new JsonBimServerClientFactory("http://localhost:8082")
-BimServerClient client = factory.create(new UsernamePasswordAuthenticationInfo("admin@localhost", "admin"))
-SProject project = client.serviceInterface.getProjectsByName(args[0])[0]
+def cli = new CliBuilder(usage: 'groovy bimservershell.groovy')
+cli.H(optionalArg: true, longOpt: 'host', args: 1, argName: 'url', 'use BimServer at given location, defaults to http://localhost:8082')
+cli.U(optionalArg: true, longOpt: 'user', args: 1, argName: 'email', 'use user to login to BimServer, defaults to admin@localhost')
+cli.P(optionalArg: true, longOpt: 'password', args: 1, argName: 'pass', 'use password to login to BimServer, defaults to admin')
+cli.M(required: true, longOpt: 'model', args: 1, argName: 'project', 'load project with given name')
+cli.R(optionalArg: true, longOpt: 'revision', args: 1, argName: 'revision', 'load given revision, defaults to last revision')
+def options = cli.parse(args)
+println "loading $options.M"
+JsonBimServerClientFactory factory = new JsonBimServerClientFactory(options.H ?: "http://localhost:8082")
+BimServerClient client = factory.create(new UsernamePasswordAuthenticationInfo(options.U ?: "admin@localhost",  options.P ?: "admin"))
+SProject project = client.serviceInterface.getProjectsByName(options.M)[0] // TODO getAllProjects and do regex matching
 
-IfcModelInterface model = client.getModel(project, project.lastRevisionId, true, false) // load deep, no geometry? interface might have changed, this one private now
-
+IfcModelInterface model = client.getModel(project, project.revisions[options.R ?: 0], true, false)
 println "loading project $project.oid into shell context"
 shell = new Groovysh([model: model] as Binding, new IO())
 shell.run('')
