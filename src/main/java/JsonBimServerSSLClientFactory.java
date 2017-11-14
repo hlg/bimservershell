@@ -1,3 +1,5 @@
+package com.ifc2citygml.gui;
+
 import org.apache.http.config.Registry;
 import org.apache.http.config.RegistryBuilder;
 import org.apache.http.conn.HttpClientConnectionManager;
@@ -7,7 +9,6 @@ import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
-import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.http.ssl.SSLContexts;
 import org.bimserver.client.BimServerClient;
 import org.bimserver.client.json.JsonBimServerClientFactory;
@@ -36,25 +37,20 @@ public class JsonBimServerSSLClientFactory extends JsonBimServerClientFactory {
   private final JsonSSLSocketReflectorFactory jsonReflectorFactory;
   private final ReflectorFactory reflectorFactory;
   private final String address;
-  private final HttpClientConnectionManager connectionManager;
+  private final SSLConnectionSocketFactory sslsf;
   private CloseableHttpClient sslHttpClient;
 
-  public JsonBimServerSSLClientFactory(String address, URL trustedCertificate) throws BimServerClientException {
+  public JsonBimServerSSLClientFactory(String address, URL trustedCertificate) throws BimServerClientException, CertificateException, NoSuchAlgorithmException, KeyStoreException, KeyManagementException, IOException {
     super(null, address); // actually we only want to call AbstractBimServerClientFactory(null) to get the service map instantiated
-    getClass().getClassLoader().getResource("bla");
-
-    this.connectionManager = connectionManager(trustedCertificate);
-    this.jsonReflectorFactory = new JsonSSLSocketReflectorFactory(getServicesMap(), connectionManager);
+    this.sslsf = new SSLConnectionSocketFactory(sslContext(trustedCertificate));
+    this.jsonReflectorFactory = new JsonSSLSocketReflectorFactory(getServicesMap(), newConnectionManager());
     this.reflectorFactory = new RealtimeReflectorFactoryBuilder(getServicesMap()).newReflectorFactory();
     this.address = address;
+    sslHttpClient = HttpClients.custom().setConnectionManager(newConnectionManager()).build();
   }
-  
+
   public CloseableHttpClient getHttpClient() {
     return sslHttpClient;
-  } 
-
-  public void initHttpClient() {
-      sslHttpClient = HttpClients.custom().setConnectionManager(connectionManager).build();
   }
 
   @Override
@@ -68,22 +64,15 @@ public class JsonBimServerSSLClientFactory extends JsonBimServerClientFactory {
 
   }
 
-  private HttpClientConnectionManager connectionManager(URL trustedCertificateStream) {
-    SSLConnectionSocketFactory sslsf = null;
-    try {
-      sslsf = new SSLConnectionSocketFactory(sslContext(trustedCertificateStream));
-      Registry<ConnectionSocketFactory> r = RegistryBuilder.<ConnectionSocketFactory>create()
-              .register("http", PlainConnectionSocketFactory.getSocketFactory())
-              .register("https", sslsf)
-              .build();
-      PoolingHttpClientConnectionManager connManager = new PoolingHttpClientConnectionManager(r);
-
-      connManager.setMaxTotal(100);
-      connManager.setDefaultMaxPerRoute(100);
-      return connManager;
-    } catch (Exception e) {
-      throw new RuntimeException(e); // TODO log and fail gracefully
-    }
+  private HttpClientConnectionManager newConnectionManager() {
+    Registry<ConnectionSocketFactory> r = RegistryBuilder.<ConnectionSocketFactory>create()
+      .register("http", PlainConnectionSocketFactory.getSocketFactory())
+      .register("https", sslsf)
+      .build();
+    PoolingHttpClientConnectionManager connManager = new PoolingHttpClientConnectionManager(r);
+    connManager.setMaxTotal(100);
+    connManager.setDefaultMaxPerRoute(100);
+    return connManager;
   }
 
   private SSLContext sslContext(URL trustedCertificate) throws KeyStoreException, CertificateException, NoSuchAlgorithmException, IOException, KeyManagementException {
@@ -98,4 +87,3 @@ public class JsonBimServerSSLClientFactory extends JsonBimServerClientFactory {
     return SSLContexts.custom().loadTrustMaterial(keystore, null).build();
   }
 }
-

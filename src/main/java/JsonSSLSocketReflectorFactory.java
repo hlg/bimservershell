@@ -20,7 +20,7 @@ public class JsonSSLSocketReflectorFactory extends JsonSocketReflectorFactory {
         private HttpClientConnectionManager sslHttpClientConnectionManager;
 
         public void close() {
-            sslHttpClientConnectionManager.shutdown(); // TODO: this seems not right, let the BimServerClientFactory handle this
+            sslHttpClientConnectionManager.shutdown();
         }
 
         public JsonSocketReflector create(String remoteAddress, TokenHolder tokenHolder) {
