@@ -1,5 +1,3 @@
-package com.ifc2citygml.gui;
-
 import org.apache.http.config.Registry;
 import org.apache.http.config.RegistryBuilder;
 import org.apache.http.conn.HttpClientConnectionManager;
@@ -9,6 +7,7 @@ import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
+import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.http.ssl.SSLContexts;
 import org.bimserver.client.BimServerClient;
 import org.bimserver.client.json.JsonBimServerClientFactory;
@@ -21,6 +20,7 @@ import org.bimserver.shared.reflector.RealtimeReflectorFactoryBuilder;
 import org.bimserver.shared.reflector.ReflectorFactory;
 
 import javax.net.ssl.SSLContext;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
@@ -76,14 +76,18 @@ public class JsonBimServerSSLClientFactory extends JsonBimServerClientFactory {
   }
 
   private SSLContext sslContext(URL trustedCertificate) throws KeyStoreException, CertificateException, NoSuchAlgorithmException, IOException, KeyManagementException {
-    KeyStore keystore = KeyStore.getInstance(KeyStore.getDefaultType());
-    keystore.load(null);  // initializes keystore
-    CertificateFactory cf = CertificateFactory.getInstance("X.509");
-    Certificate cert = null;
-    if(trustedCertificate != null) try(InputStream trustedCertStream = trustedCertificate.openStream()){
-      cert = cf.generateCertificate(trustedCertStream);
+    SSLContextBuilder sslContextBuilder = SSLContexts.custom();
+    if(trustedCertificate != null) {
+      KeyStore keystore = KeyStore.getInstance(KeyStore.getDefaultType());
+      keystore.load(null);  // initializes keystore
+      CertificateFactory cf = CertificateFactory.getInstance("X.509");
+      Certificate cert = null;
+      try (InputStream trustedCertStream = trustedCertificate.openStream()) {
+        cert = cf.generateCertificate(trustedCertStream);
+      }
+      if (cert!=null) keystore.setCertificateEntry("onlyentry", cert);
+      sslContextBuilder.loadTrustMaterial(keystore, null);
     }
-    if (cert!=null) keystore.setCertificateEntry("onlyentry", cert);
-    return SSLContexts.custom().loadTrustMaterial(keystore, null).build();
+    return sslContextBuilder.build();
   }
 }
